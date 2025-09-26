@@ -134,7 +134,7 @@ function AnalyticsPage() {
       charts: {
         monthlyTrends: last6Months,
         moduleUsage,
-        patientEngagement: engagementData,
+        patientEngagement: patientEngagementData,
         weeklyActivity
       },
       therapists: therapistPerformance,
@@ -304,6 +304,51 @@ function AnalyticsPage() {
       </div>
     );
   }
+
+  const calculatePatientEngagement = () => {
+    const registeredUsers = JSON.parse(localStorage.getItem('mindcare_registered_users') || '[]');
+    const patients = registeredUsers.filter((u: any) => u.role === 'patient');
+    const moodEntries = JSON.parse(localStorage.getItem('mindcare_mood_entries') || '[]');
+    const cbtRecords = JSON.parse(localStorage.getItem('mindcare_cbt_records') || '[]');
+    const gratitudeEntries = JSON.parse(localStorage.getItem('mindcare_gratitude_entries') || '[]');
+    const bookings = JSON.parse(localStorage.getItem('mindcare_bookings') || '[]');
+    
+    // Calculate engagement based on activity
+    const totalPatients = Math.max(patients.length, 1); // Avoid division by zero
+    
+    // Highly active: patients with multiple activities (mood tracking, therapy modules, sessions)
+    const highlyActive = patients.filter((patient: any) => {
+      const patientMoodEntries = moodEntries.filter((entry: any) => entry.userId === patient.id);
+      const patientCBT = cbtRecords.filter((record: any) => record.userId === patient.id);
+      const patientGratitude = gratitudeEntries.filter((entry: any) => entry.userId === patient.id);
+      const patientBookings = bookings.filter((booking: any) => booking.patientId === patient.id);
+      
+      const totalActivities = patientMoodEntries.length + patientCBT.length + patientGratitude.length + patientBookings.length;
+      return totalActivities >= 5; // 5+ activities = highly active
+    }).length;
+    
+    // Moderately active: patients with some activities
+    const moderatelyActive = patients.filter((patient: any) => {
+      const patientMoodEntries = moodEntries.filter((entry: any) => entry.userId === patient.id);
+      const patientCBT = cbtRecords.filter((record: any) => record.userId === patient.id);
+      const patientGratitude = gratitudeEntries.filter((entry: any) => entry.userId === patient.id);
+      const patientBookings = bookings.filter((booking: any) => booking.patientId === patient.id);
+      
+      const totalActivities = patientMoodEntries.length + patientCBT.length + patientGratitude.length + patientBookings.length;
+      return totalActivities >= 2 && totalActivities < 5; // 2-4 activities = moderately active
+    }).length;
+    
+    // Low activity: patients with minimal or no activities
+    const lowActivity = totalPatients - highlyActive - moderatelyActive;
+    
+    return [
+      { name: 'Highly Active', value: highlyActive, color: '#10B981' },
+      { name: 'Moderately Active', value: moderatelyActive, color: '#3B82F6' },
+      { name: 'Low Activity', value: Math.max(lowActivity, 0), color: '#F59E0B' }
+    ];
+  };
+
+  const patientEngagementData = calculatePatientEngagement();
 
   const stats = [
     {
@@ -514,7 +559,7 @@ function AnalyticsPage() {
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
-                  data={analyticsData.charts.patientEngagement}
+                  data={patientEngagementData}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -522,7 +567,7 @@ function AnalyticsPage() {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {analyticsData.charts.patientEngagement.map((entry: any, index: number) => (
+                  {patientEngagementData.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
